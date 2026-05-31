@@ -1,5 +1,6 @@
 package com.alibaba.cloud.ai.graph.react.service;
 
+import com.alibaba.cloud.ai.graph.react.function.AttractionService;
 import com.alibaba.cloud.ai.graph.react.function.WeatherService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -32,10 +33,12 @@ public class DashScopeChatService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private final WeatherService weatherService;
+    private final AttractionService attractionService;
 
-    public DashScopeChatService(RestTemplate restTemplate, WeatherService weatherService) {
+    public DashScopeChatService(RestTemplate restTemplate, WeatherService weatherService, AttractionService attractionService) {
         this.restTemplate = restTemplate;
         this.weatherService = weatherService;
+        this.attractionService = attractionService;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -72,6 +75,13 @@ public class DashScopeChatService {
     private List<Map<String, Object>> getTools() {
         List<Map<String, Object>> tools = new ArrayList<>();
 
+        tools.add(createWeatherTool());
+        tools.add(createAttractionTool());
+
+        return tools;
+    }
+
+    private Map<String, Object> createWeatherTool() {
         Map<String, Object> weatherTool = new HashMap<>();
         weatherTool.put("type", "function");
 
@@ -99,8 +109,38 @@ public class DashScopeChatService {
         function.put("parameters", parameters);
         weatherTool.put("function", function);
 
-        tools.add(weatherTool);
-        return tools;
+        return weatherTool;
+    }
+
+    private Map<String, Object> createAttractionTool() {
+        Map<String, Object> attractionTool = new HashMap<>();
+        attractionTool.put("type", "function");
+
+        Map<String, Object> function = new HashMap<>();
+        function.put("name", "getAttractions");
+        function.put("description", "获取指定城市的景点推荐信息");
+
+        Map<String, Object> parameters = new HashMap<>();
+        parameters.put("type", "object");
+
+        Map<String, Object> properties = new HashMap<>();
+        Map<String, Object> cityProp = new HashMap<>();
+        cityProp.put("type", "string");
+        cityProp.put("description", "城市名称");
+        properties.put("city", cityProp);
+
+        Map<String, Object> limitProp = new HashMap<>();
+        limitProp.put("type", "integer");
+        limitProp.put("description", "返回景点数量，默认5个");
+        properties.put("limit", limitProp);
+
+        parameters.put("properties", properties);
+        parameters.put("required", Arrays.asList("city"));
+
+        function.put("parameters", parameters);
+        attractionTool.put("function", function);
+
+        return attractionTool;
     }
 
     private String processResponse(String response, List<Map<String, Object>> messages) {
@@ -151,9 +191,9 @@ public class DashScopeChatService {
         try {
             JsonNode args = objectMapper.readTree(argsJson);
             String city = args.has("city") ? args.get("city").asText() : "";
-            int days = args.has("days") ? args.get("days").asInt() : 1;
 
             if ("getWeather".equals(toolName) && !city.isEmpty()) {
+                int days = args.has("days") ? args.get("days").asInt() : 1;
                 WeatherService.Request request = new WeatherService.Request(city, days);
                 WeatherService.Response response = weatherService.apply(request);
                 if (response != null) {
@@ -161,6 +201,16 @@ public class DashScopeChatService {
                         "city", response.city(),
                         "current", response.current(),
                         "forecastDays", response.forecastDays()
+                    ));
+                }
+            } else if ("getAttractions".equals(toolName) && !city.isEmpty()) {
+                int limit = args.has("limit") ? args.get("limit").asInt() : 5;
+                AttractionService.Request request = new AttractionService.Request(city, limit);
+                AttractionService.Response response = attractionService.apply(request);
+                if (response != null) {
+                    return objectMapper.writeValueAsString(Map.of(
+                        "city", response.city(),
+                        "attractions", response.attractions()
                     ));
                 }
             }
