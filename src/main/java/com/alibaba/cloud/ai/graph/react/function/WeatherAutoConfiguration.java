@@ -10,9 +10,4 @@ public class WeatherAutoConfiguration {
     public WeatherService weatherService() {
         return new WeatherService();
     }
-
-    @Bean
-    public WeatherUtils weatherUtils(WeatherService weatherService) {
-        return new WeatherUtils(weatherService);
-    }
 }

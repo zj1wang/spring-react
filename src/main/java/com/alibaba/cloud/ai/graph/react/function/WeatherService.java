@@ -1,32 +1,73 @@
 package com.alibaba.cloud.ai.graph.react.function;
 
-import java.util.HashMap;
+import com.fasterxml.jackson.annotation.JsonClassDescription;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.util.StringUtils;
+
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
 
-public class WeatherService {
+public class WeatherService implements Function<WeatherService.Request, WeatherService.Response> {
 
-    private final Map<String, String> weatherData = new HashMap<>();
+    private static final Logger logger = LoggerFactory.getLogger(WeatherService.class);
 
-    public WeatherService() {
-        initWeatherData();
-    }
-
-    private void initWeatherData() {
-        weatherData.put("北京", "{\"city\":\"北京\",\"temp\":25,\"description\":\"晴朗\",\"humidity\":45,\"wind\":\"西北风3级\"}");
-        weatherData.put("上海", "{\"city\":\"上海\",\"temp\":28,\"description\":\"多云\",\"humidity\":65,\"wind\":\"东南风2级\"}");
-        weatherData.put("广州", "{\"city\":\"广州\",\"temp\":32,\"description\":\"雷阵雨\",\"humidity\":80,\"wind\":\"南风4级\"}");
-        weatherData.put("深圳", "{\"city\":\"深圳\",\"temp\":30,\"description\":\"多云转晴\",\"humidity\":70,\"wind\":\"东风2级\"}");
-        weatherData.put("杭州", "{\"city\":\"杭州\",\"temp\":26,\"description\":\"小雨\",\"humidity\":75,\"wind\":\"东北风3级\"}");
-        weatherData.put("成都", "{\"city\":\"成都\",\"temp\":22,\"description\":\"阴\",\"humidity\":85,\"wind\":\"北风1级\"}");
-        weatherData.put("武汉", "{\"city\":\"武汉\",\"temp\":27,\"description\":\"晴转多云\",\"humidity\":55,\"wind\":\"西南风2级\"}");
-        weatherData.put("南京", "{\"city\":\"南京\",\"temp\":24,\"description\":\"多云\",\"humidity\":60,\"wind\":\"东风3级\"}");
-    }
-
-    public String getWeather(String city) {
-        String weather = weatherData.get(city);
-        if (weather != null) {
-            return weather;
+    @Override
+    public Response apply(Request request) {
+        if (request == null || !StringUtils.hasText(request.city())) {
+            logger.error("Invalid request: city is required.");
+            return null;
         }
-        return "{\"city\":\"" + city + "\",\"temp\":20,\"description\":\"晴朗\",\"humidity\":50,\"wind\":\"微风\"}";
+        try {
+            return doGetWeatherMock(request);
+        } catch (Exception e) {
+            logger.error("Failed to fetch weather data: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private Response doGetWeatherMock(Request request) {
+        if (Objects.equals("杭州", request.city())) {
+            return new Response(request.city(), Map.of("temp", 25, "condition", "Sunny"),
+                    List.of(Map.of("date", "2025-05-27", "high", 28, "low", 20)));
+        } else if (Objects.equals("上海", request.city())) {
+            return new Response(request.city(), Map.of("temp", 26, "condition", "Sunny"),
+                    List.of(Map.of("date", "2025-05-27", "high", 29, "low", 21)));
+        } else if (Objects.equals("南京", request.city())) {
+            return new Response(request.city(), Map.of("temp", 18, "condition", "cloudy"),
+                    List.of(Map.of("date", "2025-05-27", "high", 18, "low", 10)));
+        } else if (Objects.equals("北京", request.city())) {
+            return new Response(request.city(), Map.of("temp", 22, "condition", "多云"),
+                    List.of(Map.of("date", "2025-05-27", "high", 25, "low", 18)));
+        } else if (Objects.equals("广州", request.city())) {
+            return new Response(request.city(), Map.of("temp", 32, "condition", "晴"),
+                    List.of(Map.of("date", "2025-05-27", "high", 35, "low", 26)));
+        } else {
+            return new Response(request.city(), Map.of("temp", -20, "condition", "Snowy"),
+                    List.of(Map.of("date", "2025-05-27", "high", -10, "low", -30)));
+        }
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    @JsonClassDescription("Weather Service API request")
+    public record Request(
+            @JsonProperty(required = true, value = "city") @JsonPropertyDescription("city name") String city,
+            @JsonProperty(required = true,
+                    value = "days") @JsonPropertyDescription("Number of days of weather forecast. Value ranges from 1 to 14") int days) {
+    }
+
+    @JsonClassDescription("Weather Service API response")
+    public record Response(
+            @JsonProperty(required = true, value = "city") @JsonPropertyDescription("city name") String city,
+            @JsonProperty(required = true,
+                    value = "current") @JsonPropertyDescription("Current weather info") Map<String, Object> current,
+            @JsonProperty(required = true,
+                    value = "forecastDays") @JsonPropertyDescription("Forecast weather info") List<Map<String, Object>> forecastDays) {
     }
 }
